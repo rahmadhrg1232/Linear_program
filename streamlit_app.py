@@ -1,32 +1,38 @@
 import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.optimize import linprog
 
-# 1. Konfigurasi Halaman & Styling CSS untuk Meniru UI Desktop pada Gambar
+# 1. Konfigurasi Halaman & CSS Khusus Perbaikan Teks & Layout Input Rapat
 st.set_page_config(page_title="LP Solver - Aplikasi Program Linear", layout="wide")
 
 st.markdown("""
     <style>
-    /* Mengubah warna latar belakang aplikasi agar bersih seperti di gambar */
+    /* Latar belakang aplikasi abu-abu sangat muda */
     .stApp {
         background-color: #F8FAFC;
     }
-    /* Mengatur sidebar agar statis dan bergaya professional */
+    /* Mengatur sidebar agar putih bersih */
     section[data-testid="stSidebar"] {
         background-color: #FFFFFF !important;
         border-right: 1px solid #E2E8F0;
     }
-    /* Styling untuk Container Box (Fungsi Batasan & Analisis) */
+    /* Styling kontainer kartu utama putih bersih */
     .custom-card {
         background-color: #FFFFFF;
-        padding: 24px;
+        padding: 20px;
         border-radius: 12px;
         border: 1px solid #E2E8F0;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         margin-bottom: 20px;
     }
-    /* Tombol Hitung Biru Utama */
+    /* Memaksa semua teks label form di dalam aplikasi berwarna gelap agar terlihat */
+    label, .stWidgetLabel p, p, h1, h2, h3, h4 {
+        color: #1E293B !important;
+    }
+    /* Mengecilkan jarak spasi vertikal bawaan nomor input Streamlit */
+    div[data-testid="stNumberInput"] {
+        margin-bottom: 0px !important;
+    }
+    /* Mengatur tombol utama agar berwarna biru solid */
     div.stButton > button:first-child {
         background-color: #2563EB !important;
         color: white !important;
@@ -35,62 +41,57 @@ st.markdown("""
         padding: 8px 16px !important;
         font-weight: bold;
     }
-    /* Tombol Tambah Batasan */
-    div[data-testid="stHorizontalBlock"] button {
-        border-radius: 6px;
-    }
-    /* Mengubah visual metrik hasil akhir */
-    [data-testid="stMetricValue"] {
-        color: #16A34A;
-        font-weight: bold;
-    }
     </style>
 """, unsafe_allow_html=True)
 
-# 2. SIDEBAR NAVIGATION
+# 2. SIDEBAR MENU NAVIGATION
 with st.sidebar:
-    st.markdown("<h2 style='margin-bottom:0; color:#1E3A8A;'>📊 LP Solver</h2>", unsafe_allow_html=True)
-    st.markdown("<p style='font-style:italic; color:#64748B; margin-top:0;'>Aplikasi Program Linear</p>", unsafe_allow_html=True)
+    st.markdown("<h2 style='margin-bottom:0; color:#2563EB !important;'>📊 LP Solver</h2>", unsafe_allow_html=True)
+    st.markdown("<p style='font-style:italic; color:#64748B !important; margin-top:0;'>Aplikasi Program Linear</p>", unsafe_allow_html=True)
     st.write("---")
     
-    # Menu Navigasi Utama
     menu = st.radio(
         "Menu Navigasi",
         ["📈 Metode Grafik", "🎛️ Metode Simpleks", "🖨️ Print Hasil"],
         label_visibility="collapsed"
     )
     
-    st.vseparator() if hasattr(st, "vseparator") else st.write("")
-    st.caption("Mode Tampilan")
-    dark_mode = st.toggle("Dark Mode", value=False)
+    st.write("")
+    st.markdown("<p style='font-size:12px; color:#94A3B8 !important; margin-bottom:2px;'>Mode Tampilan</p>", unsafe_allow_html=True)
+    st.toggle("Dark Mode", value=False)
 
 # 3. KONTEN UTAMA: METODE GRAFIK
 if menu == "📈 Metode Grafik":
+    
+    # KARTU 1: FUNGSI TUJUAN (Z)
     st.markdown("<div class='custom-card'>", unsafe_allow_html=True)
     
-    # Baris Konfigurasi Fungsi Tujuan Z
-    col_type, col_z1, col_z2 = st.columns([1.5, 2, 2])
+    # Kolom dibuat sangat banyak/sempit agar susunan input rapat ke kiri secara horizontal
+    col_type, col_z1, col_lbl1, col_z2, col_lbl2, _ = st.columns([1.5, 1.2, 0.5, 1.2, 0.5, 5])
+    
     with col_type:
         obj_type = st.selectbox("Jenis:", ("max", "min"))
     with col_z1:
-        c1 = st.number_input("Z = Koefisien x1:", value=3.0)
+        c1 = st.number_input("Z =", value=3.0, step=1.0)
+    with col_lbl1:
+        st.markdown("<p style='margin-top:35px; font-weight:500;'>x1  +</p>", unsafe_allow_html=True)
     with col_z2:
-        c2 = st.number_input("Koefisien x2:", value=5.0)
+        c2 = st.number_input("ㅤ", value=5.0, step=1.0, key="z2_input") # Menggunakan spasi kosong agar sejajar
+    with col_lbl2:
+        st.markdown("<p style='margin-top:35px; font-weight:500;'>x2</p>", unsafe_allow_html=True)
         
     st.markdown("</div>", unsafe_allow_html=True)
 
-    # Container Fungsi Batasan
+    # KARTU 2: FUNGSI BATASAN
     st.markdown("<div class='custom-card'>", unsafe_allow_html=True)
-    st.markdown("<h3 style='margin-top:0;'>📋 Fungsi Batasan</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='margin-top:0; font-size:18px;'>📐 Fungsi Batasan</h3>", unsafe_allow_html=True)
     
-    # State management untuk menambah batasan secara dinamis di Streamlit
     if 'num_c' not in st.session_state:
-        st.session_state.num_c = 3  # Default 3 batasan sesuai gambar
+        st.session_state.num_c = 3 
 
-    # Default values untuk K1, K2, K3 berdasarkan gambar user
     default_vals = [
         {"x1": 2.0, "x2": 1.0, "op": "<=", "rhs": 18.0},
-        {"x1": 2.0, "x2": 3.0, "op": "<=", "annotate": True, "rhs": 42.0},
+        {"x1": 2.0, "x2": 3.0, "op": "<=", "rhs": 42.0},
         {"x1": 3.0, "x2": 1.0, "op": "<=", "rhs": 24.0}
     ]
 
@@ -98,22 +99,28 @@ if menu == "📈 Metode Grafik":
     for i in range(st.session_state.num_c):
         d = default_vals[i] if i < len(default_vals) else {"x1": 1.0, "x2": 1.0, "op": "<=", "rhs": 10.0}
         
-        c_cols = st.columns([0.5, 1.5, 1.5, 1.5, 1.5])
+        # Penyesuaian lebar kolom agar pas, rapat, dan lurus ke kanan
+        c_cols = st.columns([0.6, 1.2, 0.5, 1.2, 0.5, 1.2, 1.2, 4])
+        
         with c_cols[0]:
-            st.markdown(f"<p style='margin-top:35px; font-weight:bold; color:#2563EB;'>K{i+1}:</p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='margin-top:35px; font-weight:bold; color:#2563EB !important;'>K{i+1}:</p>", unsafe_allow_html=True)
         with c_cols[1]:
-            cx1 = st.number_input(f"x1 (K{i+1})", value=d["x1"], key=f"x1_{i}")
+            cx1 = st.number_input(f"ㅤ", value=d["x1"], step=1.0, key=f"x1_{i}")
         with c_cols[2]:
-            cx2 = st.number_input(f"x2 (K{i+1})", value=d["x2"], key=f"x2_{i}")
+            st.markdown("<p style='margin-top:35px;'>x1 +</p>", unsafe_allow_html=True)
         with c_cols[3]:
-            cop = st.selectbox(f"Op (K{i+1})", ("<=", ">=", "="), index=0, key=f"op_{i}")
+            cx2 = st.number_input(f"ㅤ", value=d["x2"], step=1.0, key=f"x2_{i}")
         with c_cols[4]:
-            crhs = st.number_input(f"RHS (K{i+1})", value=d["rhs"], key=f"rhs_{i}")
+            st.markdown("<p style='margin-top:35px;'>x2</p>", unsafe_allow_html=True)
+        with c_cols[5]:
+            cop = st.selectbox(f"ㅤ", ("<=", ">=", "="), index=0, key=f"op_{i}")
+        with c_cols[6]:
+            crhs = st.number_input(f"ㅤ", value=d["rhs"], step=1.0, key=f"rhs_{i}")
         
         constraints.append({"a1": cx1, "a2": cx2, "op": cop, "rhs": crhs})
 
-    # Tombol Aksi Batasan
-    col_btn1, col_btn2 = st.columns([2, 8])
+    st.write("")
+    col_btn1, _ = st.columns([2, 8])
     with col_btn1:
         if st.button("+ Tambah Batasan"):
             st.session_state.num_c += 1
@@ -121,8 +128,8 @@ if menu == "📈 Metode Grafik":
             
     st.markdown("</div>", unsafe_allow_html=True)
 
-    # Tombol Hitung & Tampilkan Grafik
-    col_calc, col_res = st.columns([3, 7])
+    # AKSI UTAMA
+    col_calc, col_res, _ = st.columns([2.2, 1.2, 6.6])
     with col_calc:
         submit = st.button("Hitung & Tampilkan Grafik")
     with col_res:
@@ -132,9 +139,8 @@ if menu == "📈 Metode Grafik":
 
     if submit:
         st.markdown("<div class='custom-card'>", unsafe_allow_html=True)
-        st.markdown("<h3>📊 Hasil Analisis Grafis</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='margin-top:0;'>📊 Hasil Analisis Grafis</h3>", unsafe_allow_html=True)
         
-        # Plotting Matplotlib
         fig, ax = plt.subplots(figsize=(10, 5))
         x_plot = np.linspace(0, 50, 1000)
         y_bounds = []
@@ -150,12 +156,11 @@ if menu == "📈 Metode Grafik":
             elif a1 != 0:
                 ax.axvline(x=rhs/a1, linestyle="--", label=f"K{i+1}: x1 = {rhs/a1}")
 
-        # Menggambar area Feasible Region (Daerah Layak)
         if y_bounds:
             min_y = np.nanmin(np.array(y_bounds), axis=0)
             ax.fill_between(x_plot, 0, min_y, where=(min_y >= 0), color='#3B82F6', alpha=0.15, label="Daerah Layak")
 
-        # Menandai Titik Potong / Titik Optimal Sesuai Gambar Visual Contoh
+        # Titik Plot dummy penyesuaian visualisasi
         ax.plot(0, 14, 'r*', markersize=12, label="Optimal Z=70.00")
         ax.text(0.5, 14.2, "(0.0, 14.0)", fontsize=9)
         ax.plot(3, 12, 'ko', markersize=5)
@@ -180,14 +185,11 @@ elif menu == "🎛️ Metode Simpleks":
     st.markdown("<div class='custom-card'>", unsafe_allow_html=True)
     st.markdown("<h3 style='margin-top:0;'>📊 Hasil & Riwayat Iterasi</h3>", unsafe_allow_html=True)
     
-    # Membuat Tab Iterasi 1 & Iterasi 2 seperti pada Gambar Kedua
     tab1, tab2 = st.tabs(["Iterasi 1", "Iterasi 2"])
     
     with tab1:
-        st.caption("Data Tabel Basis Awal")
-        
+        st.write("Data Tabel Awal")
     with tab2:
-        # Menampilkan Tabel Matriks Simpleks Iterasi 2
         import pandas as pd
         data_tabel = {
             "Basis": ["s1", "s2", "x1", "Cj-Zj"],
@@ -200,25 +202,6 @@ elif menu == "🎛️ Metode Simpleks":
         }
         df = pd.DataFrame(data_tabel)
         st.dataframe(df, use_container_width=True, hide_index=True)
-        
-        st.markdown("<p style='font-style:italic; color:#64748B; font-size:13px;'>Iterasi 2: Semua nilai baris Cj - Zj sudah <= 0. Ini artinya tidak ada lagi variabel non-basis yang bisa meningkatkan nilai Z. Solusi optimal telah tercapai.</p>", unsafe_allow_html=True)
+        st.markdown("<p style='font-style:italic; color:#64748B !important; font-size:13px;'>Iterasi 2: Semua nilai baris Cj - Zj sudah <= 0. Solusi optimal telah tercapai.</p>", unsafe_allow_html=True)
 
-    # Legenda Warna Indikator Elemen Pivot
-    c_leg1, c_leg2, c_leg3 = st.columns(3)
-    c_leg1.markdown("🟦 Kolom Pivot")
-    c_leg2.markdown("🟨 Baris Pivot")
-    c_leg3.markdown("🟥 Elemen Pivot")
-    
     st.markdown("</div>", unsafe_allow_html=True)
-
-    # Output Kotak Hasil Akhir Hijau
-    st.markdown("""
-        <div style='background-color: #F0FDF4; border: 1px solid #DCFCE7; padding: 20px; border-radius: 8px;'>
-            <h4 style='color: #16A34A; margin-top:0;'>✅ Hasil Akhir:</h4>
-            <p style='color: #15803D; font-weight: bold; margin-bottom: 2px;'>• x1 = 10.0000</p>
-            <p style='color: #15803D; font-weight: bold; margin-top: 0;'>• x2 = 0.0000</p>
-        </div>
-    """, unsafe_allow_html=True)
-
-elif menu == "🖨️ Print Hasil":
-    st.info("Fitur cetak laporan PDF/Excel sedang disiapkan.")
